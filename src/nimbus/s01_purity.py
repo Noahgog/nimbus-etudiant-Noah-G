@@ -22,7 +22,7 @@ from dataclasses import dataclass, replace
 _JOURNAL: list[str] = []
 
 
-def nettoyer_imperatif(temperatures: list[float]) -> float:
+def clean_imperative(temperatures: list[float]) -> float:
     """NE PAS IMITER. Modifie son argument, écrit dans un état global, imprime."""
     i = 0
     while i < len(temperatures):
@@ -41,7 +41,7 @@ def nettoyer_imperatif(temperatures: list[float]) -> float:
 
 
 @dataclass(frozen=True)
-class Releve:
+class Reading:
     """Un relevé immuable. `frozen=True` interdit toute affectation après création."""
 
     date: str
@@ -50,12 +50,12 @@ class Releve:
     humidite_pct: float
 
 
-def celsius_vers_fahrenheit(c: float) -> float:
+def celsius_to_fahrenheit(c: float) -> float:
     """Exercice 1.1 — échauffement : F = C × 9/5 + 32."""
     return c * 9/5 + 32
 
 
-def filtrer_plausibles(temperatures: Sequence[float], seuil: float = 60.0) -> tuple[float, ...]:
+def filter_plausible(temperatures: Sequence[float], seuil: float = 60.0) -> tuple[float, ...]:
     """Exercice 1.2 — version pure de la boucle de `nettoyer_imperatif`.
 
     Ne modifie pas l'entrée ; renvoie un tuple (immuable) des valeurs <= seuil.
@@ -63,14 +63,14 @@ def filtrer_plausibles(temperatures: Sequence[float], seuil: float = 60.0) -> tu
     return tuple(temperature for temperature in temperatures if temperature <= seuil)
 
 
-def moyenne(valeurs: Sequence[float]) -> float | None:
+def average(valeurs: Sequence[float]) -> float | None:
     """Exercice 1.3 — moyenne, ou None si la séquence est vide (pas d'exception !)."""
     if not valeurs:
         return None
     return sum(valeurs) / len(valeurs)
 
 
-def normaliser(valeurs: Sequence[float]) -> tuple[float, ...]:
+def normalize(valeurs: Sequence[float]) -> tuple[float, ...]:
     """Exercice 1.4 — normalisation min-max dans [0, 1].
 
     Si toutes les valeurs sont égales, renvoyer des 0.0. Séquence vide -> tuple vide.
@@ -84,7 +84,7 @@ def normaliser(valeurs: Sequence[float]) -> tuple[float, ...]:
     return tuple((valeur - minimum) / (maximum - minimum) for valeur in valeurs)
 
 
-def corriger_temperature(r: Releve, delta: float) -> Releve:
+def correct_temperature(r: Reading, delta: float) -> Reading:
     """Exercice 1.5 — renvoie un NOUVEAU relevé dont la température est décalée de delta.
 
     Indice : `dataclasses.replace`.
@@ -92,19 +92,19 @@ def corriger_temperature(r: Releve, delta: float) -> Releve:
     return replace(r, temperature_c=r.temperature_c + delta)
 
 
-def ajouter(historique: tuple[Releve, ...], r: Releve) -> tuple[Releve, ...]:
+def append(historique: tuple[Reading, ...], r: Reading) -> tuple[Reading, ...]:
     """Exercice 1.6 — ajoute un relevé à un historique sans le modifier."""
     return historique + (r,)
 
 
-def nettoyer_pur(temperatures: Sequence[float]) -> tuple[float | None, tuple[str, ...]]:
+def clean_pure(temperatures: Sequence[float]) -> tuple[float | None, tuple[str, ...]]:
     """Exercice 1.7 — réécriture pure de `nettoyer_imperatif`.
 
     Au lieu d'écrire dans un journal global, on RENVOIE les messages de journal
     avec le résultat : (moyenne des plausibles, ("nettoyage",)).
     C'est le germe de la monade Writer — et de l'idée « l'effet devient une valeur ».
     """
-    return moyenne(filtrer_plausibles(temperatures)), ("nettoyage",)
+    return average(filter_plausible(temperatures)), ("nettoyage",)
 
 
 # ===========================================================================
@@ -119,7 +119,7 @@ BORNES_TEMPERATURE = (-40.0, 50.0)
 
 # mypy: ignore-errors
 
-def lire_temperatures(texte: str) -> tuple[tuple[tuple[str, float], ...], int]:
+def parse_temperatures(texte: str) -> tuple[tuple[tuple[str, float], ...], int]:
     """Exercice 1.8 — ((station, température), ...) des lignes valides + nombre de rejets.
 
     Mêmes règles que le script hérité : 7 colonnes, température convertible en float,
@@ -143,7 +143,7 @@ def lire_temperatures(texte: str) -> tuple[tuple[tuple[str, float], ...], int]:
         paires.append((champs[1], temperature))
     return tuple(paires), rejets
 
-def regrouper(paires: Sequence[tuple[str, float]]) -> Mapping[str, tuple[float, ...]]:
+def group_by_station(paires: Sequence[tuple[str, float]]) -> Mapping[str, tuple[float, ...]]:
     """Exercice 1.9 — températures TRIÉES par station : {"BREST": (2.5, 3.1, ...), ...}."""
     groupes: dict[str, list[float]] = {} #dictionnaire ayant pour clé le nom de la station
     for station, temperature in paires:
@@ -151,7 +151,7 @@ def regrouper(paires: Sequence[tuple[str, float]]) -> Mapping[str, tuple[float, 
     return {station: tuple(sorted(temperatures)) for station, temperatures in groupes.items()}
 
 
-def ligne_station(station: str, temperatures: Sequence[float]) -> str:
+def station_line(station: str, temperatures: Sequence[float]) -> str:
     """Exercice 1.10 — une ligne du rapport, au format exact du script hérité.
 
     `temperatures` est supposée triée et non vide. Médiane = élément d'indice len // 2.
@@ -164,11 +164,11 @@ def ligne_station(station: str, temperatures: Sequence[float]) -> str:
     ) #Affichage pour chacune des stations, avec nb valeurs, min, max, moyenne, mediane, etc ...
 
 
-def rapport(texte: str) -> str:
+def report(texte: str) -> str:
     """Exercice 1.11 — le rapport complet, par composition des trois fonctions précédentes."""
-    paires, rejets = lire_temperatures(texte)
-    groupes = regrouper(paires)
-    lignes = [ligne_station(station, groupes[station]) for station in sorted(groupes)]
+    paires, rejets = parse_temperatures(texte)
+    groupes = group_by_station(paires)
+    lignes = [station_line(station, groupes[station]) for station in sorted(groupes)]
     lignes.append(f"Rejets : {rejets}")
     return "".join(ligne + "\n" for ligne in lignes) #Affichage final avec rejets et nb de valeurs
 
@@ -185,29 +185,29 @@ _A = 6364136223846793005
 _C = 1442695040888963407
 _MASQUE = (1 << 64) - 1
 
-def suivant(etat: int) -> int:
+def advance(etat: int) -> int:
     """Fourni : un pas de générateur congruentiel linéaire 64 bits."""
     return (_A * etat + _C) & _MASQUE #Cela produit un nouvel état pseudo-aléatoire
 
-def alea(etat: int) -> tuple[float, int]:
+def rand(etat: int) -> tuple[float, int]:
     """Exercice 1.12 — (flottant uniforme dans [0, 1), nouvel état).
 
     Calculer e2 = suivant(etat) puis renvoyer ((e2 >> 11) / 2**53, e2).
     """
-    nouvel_etat = suivant(etat)
+    nouvel_etat = advance(etat)
     return (nouvel_etat >> 11) / 2**53, nouvel_etat #on décale de 11 bits
 
 
-def alea_n(etat: int, n: int) -> tuple[tuple[float, ...], int]:
+def rand_n(etat: int, n: int) -> tuple[tuple[float, ...], int]:
     """Exercice 1.13 — n tirages successifs : on « fait passer » l'état de tirage en tirage."""
     tirages: list[float] = []
     for _ in range(n):
-        tirage, etat = alea(etat)
+        tirage, etat = rand(etat)
         tirages.append(tirage)
     return tuple(tirages), etat # renvoie les tirages effectués et une liste de sortie
 
 
-def melanger[T](xs: Sequence[T], etat: int) -> tuple[tuple[T, ...], int]:
+def shuffle[T](xs: Sequence[T], etat: int) -> tuple[tuple[T, ...], int]:
     """Exercice 1.14 — permutation aléatoire (Fisher-Yates) SANS modifier xs.
 
     Pour i de len-1 à 1 : tirer u = alea(etat), j = int(u * (i + 1)), échanger i et j
@@ -215,24 +215,24 @@ def melanger[T](xs: Sequence[T], etat: int) -> tuple[tuple[T, ...], int]:
     """
     melange = list(xs)
     for indice in range(len(melange) - 1, 0, -1):
-        tirage, etat = alea(etat)
+        tirage, etat = rand(etat)
         autre_indice = int(tirage * (indice + 1))
         melange[indice], melange[autre_indice] = melange[autre_indice], melange[indice]
     return tuple(melange), etat
 
 
-def separer(etat: int) -> tuple[int, int]:
+def split_state(etat: int) -> tuple[int, int]:
     """Exercice 1.15 — deux états indépendants à partir d'un seul (comme jax.random.split).
 
     Proposition : e1 = suivant(etat) ; e2 = suivant(e1) XOR 0x9E3779B97F4A7C15.
     Pourquoi ne faut-il JAMAIS réutiliser `etat` après l'avoir séparé ?
     """
-    premier = suivant(etat)
-    second = suivant(premier) ^ 0x9E3779B97F4A7C15 #décorrélation des 2 résultats
+    premier = advance(etat)
+    second = advance(premier) ^ 0x9E3779B97F4A7C15 #décorrélation des 2 résultats
     return premier, second
 
 
-def decouper_apprentissage_test[T](xs: Sequence[T], part_test: float, etat: int) -> tuple[tuple[T, ...], tuple[T, ...], int]:
+def train_test_split[T](xs: Sequence[T], part_test: float, etat: int) -> tuple[tuple[T, ...], tuple[T, ...], int]:
     """Exercice 1.16 — découpage train/test reproductible : (apprentissage, test, nouvel état).
 
     Mélanger, puis les round(len * part_test) premiers éléments forment le test.
@@ -240,6 +240,6 @@ def decouper_apprentissage_test[T](xs: Sequence[T], part_test: float, etat: int)
     """
     if not 0.0 <= part_test <= 1.0:
         raise ValueError("part_test doit être comprise entre 0 et 1")
-    melange, nouvel_etat = melanger(xs, etat)
+    melange, nouvel_etat = shuffle(xs, etat)
     taille_test = round(len(melange) * part_test)
     return melange[taille_test:], melange[:taille_test], nouvel_etat #données d'apprentissage, données de test et état final sont renvoyés

@@ -13,6 +13,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import assert_never
+from unittest import case
 
 # ---------------------------------------------------------------------------
 # Le type somme `Measurement` (fourni)
@@ -75,12 +76,25 @@ def parse_measurement(raw: str, lower: float, upper: float) -> Measurement:
     - hors [lower, upper]                               -> Outlier(raw, "hors bornes")
     - sinon                                             -> Valid(value)
     """
-    raise NotImplementedError("S03 — à compléter")
+    cleaned = raw.strip()
+    if cleaned in MISSING_VALUES:
+        return Missing()
+    try:
+        value = float(cleaned)
+    except ValueError:
+        return Outlier(raw, "non numérique")
+    if lower <= value <= upper:
+        return Valid(value)
+    return Outlier(raw, "hors bornes")
 
 
 def value_or(m: Measurement, default: float) -> float:
     """Exercice 3.2 — la valeur si Valid, sinon `default`. Utiliser `match`."""
-    raise NotImplementedError("S03 — à compléter")
+    match m:
+        case Valid(value) :
+            return value
+        case _:
+            return default
 
 
 def describe(m: Measurement) -> str:
@@ -90,7 +104,15 @@ def describe(m: Measurement) -> str:
     Missing()                     -> "manquante"
     Outlier("999", "hors bornes") -> "aberrante (hors bornes) : '999'"
     """
-    raise NotImplementedError("S03 — à compléter")
+    match m:
+        case Valid(value) :
+            return str(value)
+        case Missing() :
+            return "manquante"
+        case Outlier(raw, reason) :
+            return f"aberrante ({reason}) : {raw!r}"
+        case _:
+            assert_never(m)
 
 
 def parse_reading(date: str, station: str, fields: dict[str, str]) -> TypedReading:
@@ -98,7 +120,15 @@ def parse_reading(date: str, station: str, fields: dict[str, str]) -> TypedReadi
 
     `fields` associe chaque nom de BOUNDS à sa chaîne brute.
     """
-    raise NotImplementedError("S03 — à compléter")
+    return TypedReading(
+        date=date,
+        station=station,
+        temperature_c=parse_measurement(fields["temperature_c"], *BOUNDS["temperature_c"]),
+        humidity_pct=parse_measurement(fields["humidity_pct"], *BOUNDS["humidity_pct"]),
+        pressure_hpa=parse_measurement(fields["pressure_hpa"], *BOUNDS["pressure_hpa"]),
+        wind_kmh=parse_measurement(fields["wind_kmh"], *BOUNDS["wind_kmh"]),
+        rain_mm=parse_measurement(fields["rain_mm"], *BOUNDS["rain_mm"]),
+    )
 
 
 def measurements(r: TypedReading) -> tuple[Measurement, ...]:
@@ -108,13 +138,16 @@ def measurements(r: TypedReading) -> tuple[Measurement, ...]:
 
 def is_complete(r: TypedReading) -> bool:
     """Exercice 3.5 — vrai si toutes les mesures du relevé sont Valid."""
-    raise NotImplementedError("S03 — à compléter")
+    return all(isinstance(m, Valid) for m in measurements(r))
 
 
 def count_by_kind(ms: Iterable[Measurement]) -> dict[str, int]:
     """Exercice 3.6 — {"valid": n1, "missing": n2, "outlier": n3} (toujours les 3 clés)."""
-    raise NotImplementedError("S03 — à compléter")
-
+    return {
+        "valid": sum(1 for m in ms if isinstance(m, Valid)),
+        "missing": sum(1 for m in ms if isinstance(m, Missing)),
+        "outlier": sum(1 for m in ms if isinstance(m, Outlier)),
+    }
 
 # ===========================================================================
 # PARTIE B — Remplacer des valeurs magiques par un ADT (bloc 2)
@@ -166,16 +199,34 @@ def detect(r: TypedReading) -> Alert:
     Indice : `match (r.wind_kmh, r.rain_mm, r.temperature_c)` avec des guards
     (`case (Valid(v), _, _) if v >= STORM_THRESHOLD:`).
     """
-    raise NotImplementedError("S03 — à compléter")
+    match (r.wind_kmh, r.rain_mm, r.temperature_c) :
+        case (Valid(v), _, _) if v >= STORM_THRESHOLD:
+            return Storm(wind_kmh=v)
+        case (_, Valid(v), _) if v >= FLOOD_THRESHOLD:
+            return Flood(rain_mm=v)
+        case (_, _, Valid(v)) if v >= HEATWAVE_THRESHOLD:
+            return Heatwave(temperature_c=v)
+        case (_, _, Valid(v)) if v <= FROST_THRESHOLD:
+            return Frost(temperature_c=v)
+        case _:
+            return NoAlert()
 
 
 def message(date: str, station: str, a: Alert) -> str | None:
-    """Exercice 3.8 — le texte de l'alerte, au format exact du legacy ; None pour NoAlert.
-
-    `match` exhaustif terminé par `assert_never(a)` : si on ajoute un cas à Alert,
-    mypy signale cette fonction.
-    """
-    raise NotImplementedError("S03 — à compléter")
+    """Renvoie le texte d'une alerte, ou None si aucune alerte n'est présente."""
+    match a:
+        case Storm(wind_kmh):
+            return f"{date} {station} : tempête, vent {wind_kmh:.1f} km/h"
+        case Flood(rain_mm):
+            return f"{date} {station} : risque d'inondation, {rain_mm:.1f} mm"
+        case Heatwave(temperature_c):
+            return f"{date} {station} : canicule, {temperature_c:.1f} °C"
+        case Frost(temperature_c):
+            return f"{date} {station} : gel, {temperature_c:.1f} °C"
+        case NoAlert():
+            return None
+        case _:
+            assert_never(a)
 
 
 def alert_report(lines: Iterable[list[str]]) -> list[str]:
@@ -184,4 +235,16 @@ def alert_report(lines: Iterable[list[str]]) -> list[str]:
     `lines` est le résultat de `split_csv` (bloc 2, partie A) : en-tête déjà retiré.
     Utilisez `parse_reading`, `detect` et `message`.
     """
-    raise NotImplementedError("S03 — à compléter")
+    return [
+        msg
+        for line in lines
+        if len(line) == 7
+        for msg in [message(line[0], line[1], detect(parse_reading(line[0], line[1], {
+            "temperature_c": line[2],
+            "humidity_pct": line[3],
+            "pressure_hpa": line[4],
+            "wind_kmh": line[5],
+            "rain_mm": line[6],
+        })))]
+        if msg is not None
+    ]

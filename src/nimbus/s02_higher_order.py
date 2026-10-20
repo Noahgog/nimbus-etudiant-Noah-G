@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections import deque
 from collections.abc import Callable, Iterable, Iterator
+from itertools import islice
 from typing import Any
 
 from nimbus.datagen import HEADER
@@ -21,37 +22,49 @@ def compose(*fns: Fn) -> Fn:
 
     compose(f, g, h)(x) == f(g(h(x))) ; compose() est l'identité.
     """
-    raise NotImplementedError("S02 — à compléter")
+    def composed(x: Any) -> Any:
+        for fn in reversed(fns):
+            x = fn(x)
+        return x
+    return composed
 
 
 def pipe(value: Any, *fns: Fn) -> Any:
     """Exercice 2.2 — application de gauche à droite : pipe(x, h, g, f) == f(g(h(x)))."""
-    raise NotImplementedError("S02 — à compléter")
+    for fn in fns:
+        value = fn(value)
+    return value
 
 
 def curry2[A, B, C](f: Callable[[A, B], C]) -> Callable[[A], Callable[[B], C]]:
     """Exercice 2.3 — curryfication : curry2(f)(a)(b) == f(a, b)."""
-    raise NotImplementedError("S02 — à compléter")
+    return lambda a: lambda b: f(a, b)
 
 
 def my_map[A, B](f: Callable[[A], B], it: Iterable[A]) -> Iterator[B]:
     """Exercice 2.4 — `map` paresseux, écrit avec `yield` (sans utiliser map)."""
-    raise NotImplementedError("S02 — à compléter")
+    for value in it:
+        yield f(value)
 
 
 def my_filter[A](predicate: Callable[[A], bool], it: Iterable[A]) -> Iterator[A]:
     """Exercice 2.5 — `filter` paresseux, écrit avec `yield`."""
-    raise NotImplementedError("S02 — à compléter")
+    for value in it:
+        if predicate(value):
+            yield value
 
 
 def my_reduce[A, B](f: Callable[[B, A], B], it: Iterable[A], initial: B) -> B:
     """Exercice 2.6 — `reduce` (fold gauche) : f(f(f(initial, x0), x1), x2)..."""
-    raise NotImplementedError("S02 — à compléter")
+    accumulator = initial
+    for value in it:
+        accumulator = f(accumulator, value)
+    return accumulator
 
 
 def take[A](n: int, it: Iterable[A]) -> list[A]:
     """Exercice 2.7 — les n premiers éléments ; doit fonctionner sur un itérable INFINI."""
-    raise NotImplementedError("S02 — à compléter")
+    return list(islice(it, max(0, n)))
 
 
 def sliding_windows[A](it: Iterable[A], size: int) -> Iterator[tuple[A, ...]]:
@@ -60,12 +73,18 @@ def sliding_windows[A](it: Iterable[A], size: int) -> Iterator[tuple[A, ...]]:
     sliding_windows([1, 2, 3, 4], 2) -> (1, 2), (2, 3), (3, 4)
     Indice : `collections.deque(maxlen=taille)`.
     """
-    raise NotImplementedError("S02 — à compléter")
+    if size <= 0:
+        raise ValueError("size doit être strictement positif")
+    window: deque[A] = deque(maxlen=size)
+    for value in it:
+        window.append(value)
+        if len(window) == size:
+            yield tuple(window)
 
 
 def moving_average(vals: Iterable[float], size: int) -> Iterator[float]:
     """Exercice 2.9 — moyenne mobile = composition de `sliding_windows` et `my_map`."""
-    raise NotImplementedError("S02 — à compléter")
+    return my_map(lambda window: sum(window) / len(window), sliding_windows(vals, size))
 
 
 def memoize[A, B](f: Callable[[A], B]) -> Callable[[A], B]:
@@ -73,7 +92,14 @@ def memoize[A, B](f: Callable[[A], B]) -> Callable[[A], B]:
 
     N'est légitime QUE parce que f est pure : pourquoi ?
     """
-    raise NotImplementedError("S02 — à compléter")
+    cache: dict[A, B] = {}
+
+    def cached(value: A) -> B:
+        if value not in cache:
+            cache[value] = f(value)
+        return cache[value]
+
+    return cached
 
 
 # ---------------------------------------------------------------------------
@@ -94,4 +120,4 @@ def split_csv(text: str) -> Iterator[list[str]]:
     À écrire comme un pipeline : non_empty_lines -> sauter la 1re -> split.
     Indice : `itertools.islice`.
     """
-    raise NotImplementedError("S02 — à compléter")
+    return (line.split(",") for line in islice(non_empty_lines(text), 1, None))

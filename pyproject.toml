@@ -34,6 +34,7 @@ packages = ["src/nimbus"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+pythonpath = ["src"]
 
 [tool.mypy]
 strict = true

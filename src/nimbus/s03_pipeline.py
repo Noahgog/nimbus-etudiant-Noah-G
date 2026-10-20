@@ -17,6 +17,7 @@ from nimbus.s03_algebraic_types import (
     BOUNDS, Alert, Heatwave, Frost, Flood, TypedReading, NoAlert, Storm, Valid, detect,
     parse_reading,
 )
+from typing import assert_never  # à ajouter aux imports
 
 
 def readings(lines: Iterable[str]) -> Iterator[TypedReading]:
@@ -25,7 +26,14 @@ def readings(lines: Iterable[str]) -> Iterator[TypedReading]:
     Sauter l'en-tête, découper sur ",", ignorer les lignes qui n'ont pas 7 colonnes,
     construire chaque relevé avec `parse_reading`. Aucune liste intermédiaire.
     """
-    raise NotImplementedError("S03 — à compléter")
+    it = iter(lines)
+    next(it, None)  # saute l'en-tête, sans rien stocker
+    for line in it:
+        cols = line.rstrip("\r\n").split(",")
+        if len(cols) != 7:
+            continue
+        date, station, *values = cols
+        yield parse_reading(date, station, dict(zip(BOUNDS, values)))
 
 
 def count_alerts(rs: Iterable[TypedReading]) -> dict[str, int]:
@@ -33,7 +41,22 @@ def count_alerts(rs: Iterable[TypedReading]) -> dict[str, int]:
 
     Clés : "storm", "flood", "heatwave", "frost" (toujours présentes, NoAlert n'est pas compté).
     """
-    raise NotImplementedError("S03 — à compléter")
+    counts = {"storm": 0, "flood": 0, "heatwave": 0, "frost": 0}
+    for r in rs:
+        match detect(r):
+            case Storm():
+                counts["storm"] += 1
+            case Flood():
+                counts["flood"] += 1
+            case Heatwave():
+                counts["heatwave"] += 1
+            case Frost():
+                counts["frost"] += 1
+            case NoAlert():
+                pass
+            case other:
+                assert_never(other)
+    return counts
 
 
 def first_n[A](predicate: Callable[[A], bool], n: int, xs: Iterable[A]) -> list[A]:
@@ -42,7 +65,7 @@ def first_n[A](predicate: Callable[[A], bool], n: int, xs: Iterable[A]) -> list[
     Doit s'arrêter dès que n éléments sont trouvés : les tests passent un flux infini,
     ou un flux qui lève une exception au-delà du point attendu.
     """
-    raise NotImplementedError("S03 — à compléter")
+    return list(itertools.islice(filter(predicate, xs), n))
 
 
 def is_alert(a: Alert) -> bool:
@@ -53,4 +76,12 @@ def is_alert(a: Alert) -> bool:
 def max_temperature_by_station(rs: Iterable[TypedReading]) -> dict[str, float]:
     """Exercice 3.13 — température Valid maximale par station, en une passe et en mémoire
     proportionnelle au nombre de stations (pas au nombre de lignes)."""
-    raise NotImplementedError("S03 — à compléter")
+    best: dict[str, float] = {}
+    for r in rs:
+        match r.temperature_c:
+            case Valid(t):
+                if r.station not in best or t > best[r.station]:
+                    best[r.station] = t
+            case _:
+                pass
+    return best
