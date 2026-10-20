@@ -1,4 +1,4 @@
-"""Séance 1 — Pureté, transparence référentielle, immutabilité.
+"""Séance 1 Pureté, transparence référentielle, immutabilité.
 
 Idée clé : une fonction pure ne dépend que de ses arguments et ne fait rien
 d'autre que renvoyer un résultat. On peut donc remplacer tout appel par sa
@@ -19,10 +19,10 @@ from dataclasses import dataclass, replace
 # Repérez les trois effets de bord de cette fonction.
 # ---------------------------------------------------------------------------
 
-_LOG: list[str] = []
+_JOURNAL: list[str] = []
 
 
-def clean_imperative(temperatures: list[float]) -> float:
+def nettoyer_imperatif(temperatures: list[float]) -> float:
     """NE PAS IMITER. Modifie son argument, écrit dans un état global, imprime."""
     i = 0
     while i < len(temperatures):
@@ -30,7 +30,7 @@ def clean_imperative(temperatures: list[float]) -> float:
             del temperatures[i]          # 1. mutation de l'argument
         else:
             i += 1
-    _LOG.append("nettoyage")         # 2. écriture dans un état global
+    _JOURNAL.append("nettoyage")         # 2. écriture dans un état global
     print("moyenne calculée")            # 3. entrée/sortie
     return sum(temperatures) / len(temperatures)
 
@@ -41,62 +41,70 @@ def clean_imperative(temperatures: list[float]) -> float:
 
 
 @dataclass(frozen=True)
-class Reading:
+class Releve:
     """Un relevé immuable. `frozen=True` interdit toute affectation après création."""
 
     date: str
     station: str
     temperature_c: float
-    humidity_pct: float
+    humidite_pct: float
 
 
-def celsius_to_fahrenheit(c: float) -> float:
+def celsius_vers_fahrenheit(c: float) -> float:
     """Exercice 1.1 — échauffement : F = C × 9/5 + 32."""
-    raise NotImplementedError("S01 — à compléter")
+    return c * 9/5 + 32
 
 
-def filter_plausible(temperatures: Sequence[float], threshold: float = 60.0) -> tuple[float, ...]:
-    """Exercice 1.2 — version pure de la boucle de `clean_imperative`.
+def filtrer_plausibles(temperatures: Sequence[float], seuil: float = 60.0) -> tuple[float, ...]:
+    """Exercice 1.2 — version pure de la boucle de `nettoyer_imperatif`.
 
     Ne modifie pas l'entrée ; renvoie un tuple (immuable) des valeurs <= seuil.
     """
-    raise NotImplementedError("S01 — à compléter")
+    return tuple(temperature for temperature in temperatures if temperature <= seuil)
 
 
-def average(vals: Sequence[float]) -> float | None:
+def moyenne(valeurs: Sequence[float]) -> float | None:
     """Exercice 1.3 — moyenne, ou None si la séquence est vide (pas d'exception !)."""
-    raise NotImplementedError("S01 — à compléter")
+    if not valeurs:
+        return None
+    return sum(valeurs) / len(valeurs)
 
 
-def normalize(vals: Sequence[float]) -> tuple[float, ...]:
+def normaliser(valeurs: Sequence[float]) -> tuple[float, ...]:
     """Exercice 1.4 — normalisation min-max dans [0, 1].
 
     Si toutes les valeurs sont égales, renvoyer des 0.0. Séquence vide -> tuple vide.
     """
-    raise NotImplementedError("S01 — à compléter")
+    if not valeurs:
+        return ()
+    minimum = min(valeurs)
+    maximum = max(valeurs)
+    if minimum == maximum:
+        return tuple(0.0 for _ in valeurs)
+    return tuple((valeur - minimum) / (maximum - minimum) for valeur in valeurs)
 
 
-def correct_temperature(r: Reading, delta: float) -> Reading:
+def corriger_temperature(r: Releve, delta: float) -> Releve:
     """Exercice 1.5 — renvoie un NOUVEAU relevé dont la température est décalée de delta.
 
     Indice : `dataclasses.replace`.
     """
-    raise NotImplementedError("S01 — à compléter")
+    return replace(r, temperature_c=r.temperature_c + delta)
 
 
-def append(history: tuple[Reading, ...], r: Reading) -> tuple[Reading, ...]:
+def ajouter(historique: tuple[Releve, ...], r: Releve) -> tuple[Releve, ...]:
     """Exercice 1.6 — ajoute un relevé à un historique sans le modifier."""
-    raise NotImplementedError("S01 — à compléter")
+    return historique + (r,)
 
 
-def clean_pure(temperatures: Sequence[float]) -> tuple[float | None, tuple[str, ...]]:
-    """Exercice 1.7 — réécriture pure de `clean_imperative`.
+def nettoyer_pur(temperatures: Sequence[float]) -> tuple[float | None, tuple[str, ...]]:
+    """Exercice 1.7 — réécriture pure de `nettoyer_imperatif`.
 
     Au lieu d'écrire dans un journal global, on RENVOIE les messages de journal
     avec le résultat : (moyenne des plausibles, ("nettoyage",)).
     C'est le germe de la monade Writer — et de l'idée « l'effet devient une valeur ».
     """
-    raise NotImplementedError("S01 — à compléter")
+    return moyenne(filtrer_plausibles(temperatures)), ("nettoyage",)
 
 
 # ===========================================================================
@@ -104,37 +112,65 @@ def clean_pure(temperatures: Sequence[float]) -> tuple[float | None, tuple[str, 
 # ===========================================================================
 # Lisez `nimbus/s01_legacy.py`. Il produit un rapport par station en s'appuyant
 # sur trois variables globales, des mutations et des `print`. Réécrivez-le en
-# fonctions pures. Contrainte : `report(text)` doit renvoyer EXACTEMENT le
+# fonctions pures. Contrainte : `rapport(texte)` doit renvoyer EXACTEMENT le
 # texte que le script hérité affiche (un `\n` à la fin de chaque ligne).
 
-TEMPERATURE_BOUNDS = (-40.0, 50.0)
+BORNES_TEMPERATURE = (-40.0, 50.0)
 
+# mypy: ignore-errors
 
-def parse_temperatures(text: str) -> tuple[tuple[tuple[str, float], ...], int]:
+def lire_temperatures(texte: str) -> tuple[tuple[tuple[str, float], ...], int]:
     """Exercice 1.8 — ((station, température), ...) des lignes valides + nombre de rejets.
 
     Mêmes règles que le script hérité : 7 colonnes, température convertible en float,
-    comprise dans TEMPERATURE_BOUNDS (bornes incluses). L'en-tête est ignoré.
+    comprise dans BORNES_TEMPERATURE (bornes incluses). L'en-tête est ignoré.
     """
-    raise NotImplementedError("S01 — à compléter")
+    paires: list[tuple[str, float]] = []
+    rejets = 0
+    for ligne in texte.splitlines()[1:]:
+        champs = ligne.split(",")
+        if len(champs) != 7: #une ligne contient 7 colonnes
+            rejets += 1
+            continue
+        try:
+            temperature = float(champs[2]) #3eme ligne comprend température
+        except ValueError:
+            rejets += 1
+            continue #si la conversion en float échoue
+        if not BORNES_TEMPERATURE[0] <= temperature <= BORNES_TEMPERATURE[1]: #selon la variable préalablement définie
+            rejets += 1
+            continue
+        paires.append((champs[1], temperature))
+    return tuple(paires), rejets
 
-
-def group_by_station(pairs: Sequence[tuple[str, float]]) -> Mapping[str, tuple[float, ...]]:
+def regrouper(paires: Sequence[tuple[str, float]]) -> Mapping[str, tuple[float, ...]]:
     """Exercice 1.9 — températures TRIÉES par station : {"BREST": (2.5, 3.1, ...), ...}."""
-    raise NotImplementedError("S01 — à compléter")
+    groupes: dict[str, list[float]] = {} #dictionnaire ayant pour clé le nom de la station
+    for station, temperature in paires:
+        groupes.setdefault(station, []).append(temperature) #ajout de la température si station existe déjà, sinon on l'ajoute en créant une liste vide, objectif est de regrouper toutes les températures d'une même station
+    return {station: tuple(sorted(temperatures)) for station, temperatures in groupes.items()}
 
 
-def station_line(station: str, temperatures: Sequence[float]) -> str:
+def ligne_station(station: str, temperatures: Sequence[float]) -> str:
     """Exercice 1.10 — une ligne du rapport, au format exact du script hérité.
 
     `temperatures` est supposée triée et non vide. Médiane = élément d'indice len // 2.
     """
-    raise NotImplementedError("S01 — à compléter")
+    moyenne_station = sum(temperatures) / len(temperatures) # moyenne des températures d'une station
+    mediane = temperatures[len(temperatures) // 2] # valeur médiane pour élément central, valeur du "milieu"
+    return (
+        f"{station:<8} n={len(temperatures):<4} moyenne={moyenne_station:6.2f}  "
+        f"médiane={mediane:6.2f}  min={temperatures[0]:6.1f}  max={temperatures[-1]:6.1f}"
+    ) #Affichage pour chacune des stations, avec nb valeurs, min, max, moyenne, mediane, etc ...
 
 
-def report(text: str) -> str:
+def rapport(texte: str) -> str:
     """Exercice 1.11 — le rapport complet, par composition des trois fonctions précédentes."""
-    raise NotImplementedError("S01 — à compléter")
+    paires, rejets = lire_temperatures(texte)
+    groupes = regrouper(paires)
+    lignes = [ligne_station(station, groupes[station]) for station in sorted(groupes)]
+    lignes.append(f"Rejets : {rejets}")
+    return "".join(ligne + "\n" for ligne in lignes) #Affichage final avec rejets et nb de valeurs
 
 
 # ===========================================================================
@@ -147,49 +183,63 @@ def report(text: str) -> str:
 
 _A = 6364136223846793005
 _C = 1442695040888963407
-_MASK = (1 << 64) - 1
+_MASQUE = (1 << 64) - 1
 
-
-def advance(state: int) -> int:
+def suivant(etat: int) -> int:
     """Fourni : un pas de générateur congruentiel linéaire 64 bits."""
-    return (_A * state + _C) & _MASK
+    return (_A * etat + _C) & _MASQUE #Cela produit un nouvel état pseudo-aléatoire
 
-
-def rand(state: int) -> tuple[float, int]:
+def alea(etat: int) -> tuple[float, int]:
     """Exercice 1.12 — (flottant uniforme dans [0, 1), nouvel état).
 
-    Calculer e2 = advance(state) puis renvoyer ((e2 >> 11) / 2**53, e2).
+    Calculer e2 = suivant(etat) puis renvoyer ((e2 >> 11) / 2**53, e2).
     """
-    raise NotImplementedError("S01 — à compléter")
+    nouvel_etat = suivant(etat)
+    return (nouvel_etat >> 11) / 2**53, nouvel_etat #on décale de 11 bits
 
 
-def rand_n(state: int, n: int) -> tuple[tuple[float, ...], int]:
+def alea_n(etat: int, n: int) -> tuple[tuple[float, ...], int]:
     """Exercice 1.13 — n tirages successifs : on « fait passer » l'état de tirage en tirage."""
-    raise NotImplementedError("S01 — à compléter")
+    tirages: list[float] = []
+    for _ in range(n):
+        tirage, etat = alea(etat)
+        tirages.append(tirage)
+    return tuple(tirages), etat # renvoie les tirages effectués et une liste de sortie
 
 
-def shuffle[T](xs: Sequence[T], state: int) -> tuple[tuple[T, ...], int]:
+def melanger[T](xs: Sequence[T], etat: int) -> tuple[tuple[T, ...], int]:
     """Exercice 1.14 — permutation aléatoire (Fisher-Yates) SANS modifier xs.
 
-    Pour i de len-1 à 1 : tirer u = rand(state), j = int(u * (i + 1)), échanger i et j
+    Pour i de len-1 à 1 : tirer u = alea(etat), j = int(u * (i + 1)), échanger i et j
     dans une COPIE locale. Renvoyer (tuple mélangé, état final).
     """
-    raise NotImplementedError("S01 — à compléter")
+    melange = list(xs)
+    for indice in range(len(melange) - 1, 0, -1):
+        tirage, etat = alea(etat)
+        autre_indice = int(tirage * (indice + 1))
+        melange[indice], melange[autre_indice] = melange[autre_indice], melange[indice]
+    return tuple(melange), etat
 
 
-def split_state(state: int) -> tuple[int, int]:
+def separer(etat: int) -> tuple[int, int]:
     """Exercice 1.15 — deux états indépendants à partir d'un seul (comme jax.random.split).
 
-    Proposition : e1 = advance(state) ; e2 = advance(e1) XOR 0x9E3779B97F4A7C15.
-    Pourquoi ne faut-il JAMAIS réutiliser `state` après l'avoir séparé ?
+    Proposition : e1 = suivant(etat) ; e2 = suivant(e1) XOR 0x9E3779B97F4A7C15.
+    Pourquoi ne faut-il JAMAIS réutiliser `etat` après l'avoir séparé ?
     """
-    raise NotImplementedError("S01 — à compléter")
+    premier = suivant(etat)
+    second = suivant(premier) ^ 0x9E3779B97F4A7C15 #décorrélation des 2 résultats
+    return premier, second
 
 
-def train_test_split[T](xs: Sequence[T], part_test: float, state: int) -> tuple[tuple[T, ...], tuple[T, ...], int]:
+def decouper_apprentissage_test[T](xs: Sequence[T], part_test: float, etat: int) -> tuple[tuple[T, ...], tuple[T, ...], int]:
     """Exercice 1.16 — découpage train/test reproductible : (apprentissage, test, nouvel état).
 
     Mélanger, puis les round(len * part_test) premiers éléments forment le test.
     Même graine => même découpage, sur toutes les machines : c'est ça, la reproductibilité.
     """
-    raise NotImplementedError("S01 — à compléter")
+    if not 0.0 <= part_test <= 1.0:
+        raise ValueError("part_test doit être comprise entre 0 et 1")
+    melange, nouvel_etat = melanger(xs, etat)
+    taille_test = round(len(melange) * part_test)
+    return melange[taille_test:], melange[:taille_test], nouvel_etat #données d'apprentissage, données de test et état final sont renvoyés
