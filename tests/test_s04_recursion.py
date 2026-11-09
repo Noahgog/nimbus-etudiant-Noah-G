@@ -40,3 +40,11 @@ def test_scan_and_fill():
 def test_trampoline_does_not_overflow():
     large = from_iterable(range(100_000))
     assert sum_trampoline(large) == sum(range(100_000))
+
+
+def test_bonus_fold_right_safe():
+    from nimbus.s04_recursion import fold_right_safe
+    small = from_iterable([1, 2, 3])
+    assert fold_right_safe(small, 0, operator.sub) == fold_right(small, 0, operator.sub) == 2
+    large = from_iterable(range(100_000))
+    assert fold_right_safe(large, 0, operator.add) == sum(range(100_000))
