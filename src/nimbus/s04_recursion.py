@@ -57,11 +57,13 @@ def to_python_list[A](l: LinkedList[A]) -> list[A]:
 # Exercices
 # ---------------------------------------------------------------------------
 
-
 def length[A](l: LinkedList[A]) -> int:
     """Exercice 4.1 — longueur, en RÉCURSIF avec `match` (pas de boucle)."""
-    raise NotImplementedError("S04 — à compléter")
-
+    match l :
+        case Empty (): 
+            return 0
+        case Cons(_,queue) : 
+            return 1 + length(queue)
 
 def fold_left[A, B](l: LinkedList[A], initial: B, f: Callable[[B, A], B]) -> B:
     """Exercice 4.2 — fold gauche : f(f(f(initial, a0), a1), a2).
@@ -69,22 +71,28 @@ def fold_left[A, B](l: LinkedList[A], initial: B, f: Callable[[B, A], B]) -> B:
     Sa forme récursive est TERMINALE, donc on a le droit de l'écrire avec une
     boucle `while` : c'est exactement ce qu'un compilateur avec TCO produirait.
     """
-    raise NotImplementedError("S04 — à compléter")
-
+    while isinstance(l, Cons):
+        initial = f(initial, l.head)
+        l = l.queue
+    return initial
 
 def fold_right[A, B](l: LinkedList[A], initial: B, f: Callable[[A, B], B]) -> B:
     """Exercice 4.3 — fold droit : f(a0, f(a1, f(a2, initial))). En récursif."""
-    raise NotImplementedError("S04 — à compléter")
-
+    match l:
+        case Empty():
+            return initial
+        case Cons(head, queue):
+            return f(head, fold_right(queue, initial, f))
 
 def reverse[A](l: LinkedList[A]) -> LinkedList[A]:
     """Exercice 4.4 — inverser une liste avec fold_left (une ligne)."""
-    raise NotImplementedError("S04 — à compléter")
-
+    initial: LinkedList[A] = EMPTY
+    return fold_left(l, initial, lambda acc, x: Cons(x, acc))
 
 def map_list[A, B](l: LinkedList[A], f: Callable[[A], B]) -> LinkedList[B]:
     """Exercice 4.5 — map avec fold_right (une ligne)."""
-    raise NotImplementedError("S04 — à compléter")
+    initial: LinkedList[B] = EMPTY
+    return fold_right(l, initial, lambda x, acc: Cons(f(x), acc))
 
 
 def scan_left[A, B](xs: Iterable[A], initial: B, f: Callable[[B, A], B]) -> list[B]:
@@ -92,8 +100,11 @@ def scan_left[A, B](xs: Iterable[A], initial: B, f: Callable[[B, A], B]) -> list
 
     scan_left([1, 2, 3], 0, add) == [0, 1, 3, 6]
     """
-    raise NotImplementedError("S04 — à compléter")
-
+    results = [initial]
+    for x in xs:
+        initial = f(initial, x)
+        results.append(initial)
+    return results
 
 def fill_gaps(ms: Iterable[Measurement]) -> list[float | None]:
     """Exercice 4.7 — imputation « dernière valeur connue » (forward fill) via scan_left.
@@ -101,8 +112,13 @@ def fill_gaps(ms: Iterable[Measurement]) -> list[float | None]:
     [Valid(1), Missing(), Outlier(..), Valid(4)] -> [1.0, 1.0, 1.0, 4.0]
     Avant la première valeur valide : None.
     """
-    raise NotImplementedError("S04 — à compléter")
-
+    def f(acc: float | None, m: Measurement) -> float | None:
+        match m:
+            case Valid(value):
+                return value
+            case Missing() | Outlier():
+                return acc
+    return scan_left(ms, None, f)[1:]
 
 # ---------------------------------------------------------------------------
 # Trampoline : récursion sans exploser la pile
@@ -124,7 +140,14 @@ type Trampoline[A] = Done[A] | Bounce[A]
 
 def run_trampoline[A](t: Trampoline[A]) -> A:
     """Exercice 4.8 — déroule les rebonds dans une boucle jusqu'à obtenir Done."""
-    raise NotImplementedError("S04 — à compléter")
+    while True:
+        match t:
+            case Done(value):
+                return value
+            case Bounce(then):
+                t = then()
+            case _:
+                assert_never(t)
 
 
 def sum_trampoline(l: LinkedList[float]) -> float:
@@ -133,7 +156,14 @@ def sum_trampoline(l: LinkedList[float]) -> float:
     Écrire une fonction auxiliaire récursive qui renvoie Bounce(lambda: aux(queue, acc + tete))
     au lieu de s'appeler directement.
     """
-    raise NotImplementedError("S04 — à compléter")
+    def aux(current: LinkedList[float], acc: float) -> Trampoline[float]:
+        match current:
+            case Empty():
+                return Done(acc)
+            case Cons(head, queue):
+                return Bounce(lambda: aux(queue, acc + head))
+
+    return run_trampoline(aux(l, 0.0))
 
 
 # ---------------------------------------------------------------------------
@@ -147,4 +177,4 @@ def fold_right_safe[A, B](l: LinkedList[A], initial: B, f: Callable[[A, B], B]) 
     Indice : fold_right(l, z, f) == fold_left(reverse(l), z, lambda acc, x: f(x, acc)).
     Pourquoi est-ce vrai ? Que coûte `reverse` en mémoire ?
     """
-    raise NotImplementedError("S04 — à compléter")
+    return fold_left(reverse(l), initial, lambda acc, x: f(x, acc))
