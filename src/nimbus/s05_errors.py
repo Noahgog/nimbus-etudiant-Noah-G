@@ -31,11 +31,11 @@ class Ok[T]:
 
     def map[U](self, f: Callable[[T], U]) -> Ok[U]:
         """Exercice 5.1a"""
-        raise NotImplementedError("S05 — à compléter")
+        return Ok(f(self.value))
 
     def flat_map[U, E](self, f: Callable[[T], Result[U, E]]) -> Result[U, E]:
         """Exercice 5.1b"""
-        raise NotImplementedError("S05 — à compléter")
+        return f(self.value)
 
     def get_or(self, default: Any) -> T:
         return self.value
@@ -50,11 +50,11 @@ class Err[E]:
 
     def map(self, f: Callable[[Any], Any]) -> Err[E]:
         """Exercice 5.1c — un échec reste un échec."""
-        raise NotImplementedError("S05 — à compléter")
+        return self
 
     def flat_map(self, f: Callable[[Any], Any]) -> Err[E]:
         """Exercice 5.1d"""
-        raise NotImplementedError("S05 — à compléter")
+        return self
 
     def get_or[T](self, default: T) -> T:
         return default
@@ -65,21 +65,27 @@ class Err[E]:
 
 type Result[T, E] = Ok[T] | Err[E]
 
-
 def attempt[T](f: Callable[[], T]) -> Result[T, str]:
     """Exercice 5.2 — pont avec le monde à exceptions : exécute f, capture l'exception en Err(message)."""
-    raise NotImplementedError("S05 — à compléter")
-
+    try:
+        return Ok(f())
+    except Exception as e:
+        return Err(f"{type(e).__name__}: {e}")
 
 def traverse[A, B, E](xs: Iterable[A], f: Callable[[A], Result[B, E]]) -> Result[list[B], E]:
     """Exercice 5.3 — applique f à chaque élément ; Ok(liste) si tout réussit, sinon le PREMIER Err."""
-    raise NotImplementedError("S05 — à compléter")
-
+    result: list[B] = []
+    for x in xs:
+        match f(x):
+            case Ok(value):
+                result.append(value)
+            case Err(error):
+                return Err(error)
+    return Ok(result)
 
 # ---------------------------------------------------------------------------
 # Validation (accumule les erreurs)
 # ---------------------------------------------------------------------------
-
 
 @dataclass(frozen=True)
 class Success[T]:
@@ -104,8 +110,18 @@ def combine(*validations: Validation[Any]) -> Validation[tuple[Any, ...]]:
 
     Tous Success -> Success(tuple des valeurs) ; sinon Failures(concaténation de TOUTES les erreurs).
     """
-    raise NotImplementedError("S05 — à compléter")
-
+    values: list[Any] = []
+    errors: list[str] = []
+    for v in validations:
+        match v:
+            case Success(value):
+                values.append(value)
+            case Failures(errs):
+                errors.extend(errs)
+    if errors:
+        return Failures(tuple(errors))
+    else:
+        return Success(tuple(values))
 
 def _date_iso(s: str) -> Validation[str]:
     """Fourni (utilise `attempt`)."""
@@ -115,7 +131,6 @@ def _date_iso(s: str) -> Validation[str]:
         case Err(_):
             return Failures((f"date invalide {s!r}",))
     raise AssertionError  # inatteignable
-
 
 def validate_line(fields: list[str], stations: Collection[str] = STATIONS) -> Validation[TypedReading]:
     """Exercice 5.5 — valide la STRUCTURE d'une ligne et construit le TypedReading.
@@ -128,8 +143,19 @@ def validate_line(fields: list[str], stations: Collection[str] = STATIONS) -> Va
     Les mesures elles-mêmes ne font PAS échouer la ligne : elles deviennent des
     `Measurement` via `parse_reading` (séance 3).
     """
-    raise NotImplementedError("S05 — à compléter")
-
+    if len(fields) != len(COLUMNS):
+        return Failures((f"attendu {len(COLUMNS)} colonnes, reçu {len(fields)}",))
+    date_str, station, *measurements = fields
+    date_validation = _date_iso(date_str)
+    station_validation = validate(station in stations, station, f"station inconnue {station!r}")
+    combined = combine(date_validation, station_validation)
+    match combined:
+        case Success((valid_date, valid_station)):
+            reading_fields = dict(zip(BOUNDS, measurements))
+            return Success(parse_reading(valid_date, valid_station, reading_fields))
+        case Failures(errors):
+            return Failures(errors)
+    raise AssertionError("résultat de validation inattendu")
 
 @dataclass(frozen=True)
 class Loaded:
@@ -142,8 +168,17 @@ def load(csv_text: str) -> Loaded:
 
     Numéro de ligne : 2 pour la première ligne de données (l'en-tête est la ligne 1).
     """
-    raise NotImplementedError("S05 — à compléter")
-
+    lines = split_csv(csv_text)
+    readings: list[TypedReading] = []
+    rejected: list[tuple[int, tuple[str, ...]]] = []
+    for line_number, fields in enumerate(lines, start=2):
+        validation = validate_line(fields)
+        match validation:
+            case Success(reading):
+                readings.append(reading)
+            case Failures(errors):
+                rejected.append((line_number, errors))
+    return Loaded(tuple(readings), tuple(rejected))
 
 # ===========================================================================
 # Partie B — remplacer un import à exceptions (bloc 3)
@@ -160,8 +195,11 @@ def rejection_lines(loaded: Loaded) -> list[str]:
 
     (les erreurs d'une même ligne séparées par " ; ").
     """
-    raise NotImplementedError("S05 — à compléter")
-
+    lines: list[str] = []
+    for line_number, errors in loaded.rejected:
+        error_messages = " ; ".join(errors)
+        lines.append(f"ligne {line_number} : {error_messages}")
+    return lines
 
 def measurement_quality(loaded: Loaded) -> dict[str, dict[str, int]]:
     """Exercice 5.8 — pour chaque colonne de mesure (clés de BOUNDS), le décompte
@@ -169,8 +207,10 @@ def measurement_quality(loaded: Loaded) -> dict[str, dict[str, int]]:
 
     Réutilisez `count_by_kind` (bloc 2) et `getattr(r, column)`.
     """
-    raise NotImplementedError("S05 — à compléter")
-
+    return {
+        column: count_by_kind([getattr(reading, column) for reading in loaded.readings])
+        for column in BOUNDS
+    }
 
 # ===========================================================================
 # Partie C — un profil d'erreurs sur un flux, en mémoire constante
@@ -189,10 +229,27 @@ def validate_stream(lines: Iterable[str], stations: Collection[str]) -> Iterator
     `lines` commence par l'en-tête (ligne 1, ignorée). Une ligne vide est ignorée.
     Aucune liste intermédiaire : un generator.
     """
-    raise NotImplementedError("S05 — à compléter")
+    for line_number, line in enumerate(lines, start=1):
+        if line_number == 1 or not line.strip():
+            continue
+        fields = line.split(",")
+        yield (line_number, validate_line(fields, stations))
 
 
 def error_profile(lines: Iterable[str], stations: Collection[str]) -> dict[str, int]:
     """Exercice 5.10 — nombre d'erreurs par nature (`error_kind`) sur tout le flux, plus
     la clé "lignes valides". Une seule passe, mémoire proportionnelle au nombre de natures."""
-    raise NotImplementedError("S05 — à compléter")
+    profile: dict[str, int] = {"lignes valides": 0}
+    for line_number, line in enumerate(lines, start=1):
+        if line_number == 1 or not line.strip():
+            continue
+        fields = line.split(",")
+        validation = validate_line(fields, stations)
+        match validation:
+            case Success(_):
+                profile["lignes valides"] += 1
+            case Failures(errors):
+                for error in errors:
+                    kind = error_kind(error)
+                    profile[kind] = profile.get(kind, 0) + 1
+    return profile
