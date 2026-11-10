@@ -33,7 +33,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from functools import reduce
-from typing import Any
+from typing import Any, cast
 
 BITS = 5
 WIDTH = 1 << BITS      # 32
@@ -65,12 +65,49 @@ def depth(v: Vector[Any]) -> int:
 
 def lookup[T](v: Vector[T], i: int) -> T:
     """D1 ★★ — l'élément d'indice i en O(log32 n). IndexError si i hors de [0, size)."""
-    raise NotImplementedError("S01 — à compléter")
+    if i < 0 or i >= v.size:
+        raise IndexError(i)
+    node = v.root
+    level = v.offset
+    while level > 0:
+        node = node[(i >> level) & MASK]
+        level -= BITS
+    return cast(T, node[i & MASK])
 
 
 def update[T](v: Vector[T], i: int, x: T) -> Vector[T]:
     """D2 ★★ — nouvelle version où l'élément i vaut x ; seul le chemin est recopié."""
-    raise NotImplementedError("S01 — à compléter")
+    if i < 0 or i >= v.size:
+        raise IndexError(i)
+
+    def replace(node: Node, level: int) -> Node:
+        index = (i >> level) & MASK if level > 0 else i & MASK
+        children = list(node)
+        if level == 0:
+            children[index] = x
+        else:
+            children[index] = replace(node[index], level - BITS)
+        return tuple(children)
+
+    return Vector(v.size, v.offset, replace(v.root, v.offset))
+
+
+def _new_path[T](level: int, x: T) -> Node:
+    if level == 0:
+        return (x,)
+    return (_new_path(level - BITS, x),)
+
+
+def _append_node[T](node: Node, level: int, size: int, x: T) -> Node:
+    if level == 0:
+        return (*node, x)
+    child_index = (size >> level) & MASK
+    children = list(node)
+    if child_index < len(children):
+        children[child_index] = _append_node(children[child_index], level - BITS, size, x)
+    else:
+        children.append(_new_path(level - BITS, x))
+    return tuple(children)
 
 
 def append[T](v: Vector[T], x: T) -> Vector[T]:
@@ -81,7 +118,26 @@ def append[T](v: Vector[T], x: T) -> Vector[T]:
     sinon : descendre en recopiant le chemin, et créer un chemin neuf là où l'enfant
     n'existe pas encore.
     """
-    raise NotImplementedError("S01 — à compléter")
+    if v.size == 0:
+        return Vector(1, 0, (x,))
+    if v.size == 1 << (v.offset + BITS):
+        root = (v.root, _new_path(v.offset, x))
+        return Vector(v.size + 1, v.offset + BITS, root)
+    return Vector(v.size + 1, v.offset, _append_node(v.root, v.offset, v.size, x))
+
+
+def _pop_node(node: Node, level: int, index: int) -> Node:
+    child_index = (index >> level) & MASK if level > 0 else index & MASK
+    children = list(node)
+    if level == 0:
+        children.pop()
+    else:
+        updated_child = _pop_node(node[child_index], level - BITS, index)
+        if updated_child:
+            children[child_index] = updated_child
+        else:
+            children.pop()
+    return tuple(children)
 
 
 def pop_last[T](v: Vector[T]) -> Vector[T]:
@@ -90,12 +146,33 @@ def pop_last[T](v: Vector[T]) -> Vector[T]:
     Attention aux nœuds devenus vides (à supprimer) et à la racine qui n'a plus
     qu'un enfant (l'arbre doit perdre un niveau).
     """
-    raise NotImplementedError("S01 — à compléter")
+    if v.size == 0:
+        raise IndexError("pop from empty vector")
+    if v.size == 1:
+        return EMPTY
+
+    root = _pop_node(v.root, v.offset, v.size - 1)
+    offset = v.offset
+    while offset > 0 and len(root) == 1:
+        root = root[0]
+        offset -= BITS
+    return Vector(v.size - 1, offset, root)
 
 
 def to_tuple[T](v: Vector[T]) -> tuple[T, ...]:
     """D5 ★★ — tous les éléments dans l'ordre (parcours de l'arbre, sans appeler obtenir n fois)."""
-    raise NotImplementedError("S01 — à compléter")
+    values: list[T] = []
+
+    def visit(node: Node, level: int) -> None:
+        if level == 0:
+            values.extend(node)
+        else:
+            for child in node:
+                visit(child, level - BITS)
+
+    if v.size:
+        visit(v.root, v.offset)
+    return tuple(values)
 
 
 def from_iterable[T](xs: Iterable[T]) -> Vector[T]:
