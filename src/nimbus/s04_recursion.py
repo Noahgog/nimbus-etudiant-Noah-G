@@ -134,3 +134,17 @@ def sum_trampoline(l: LinkedList[float]) -> float:
     au lieu de s'appeler directement.
     """
     raise NotImplementedError("S04 — à compléter")
+
+
+# ---------------------------------------------------------------------------
+# Bonus
+# ---------------------------------------------------------------------------
+
+
+def fold_right_safe[A, B](l: LinkedList[A], initial: B, f: Callable[[A, B], B]) -> B:
+    """Bonus 4.10 — même résultat que `fold_right`, sans récursion : marche sur 100 000 éléments.
+
+    Indice : fold_right(l, z, f) == fold_left(reverse(l), z, lambda acc, x: f(x, acc)).
+    Pourquoi est-ce vrai ? Que coûte `reverse` en mémoire ?
+    """
+    raise NotImplementedError("S04 — à compléter")

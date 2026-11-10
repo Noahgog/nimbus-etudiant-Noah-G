@@ -11,14 +11,14 @@ VALEUR : `Result[T, E] = Ok[T] | Err[E]` (Either en Scala/Haskell).
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Collection, Iterable, Iterator
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
 from nimbus.datagen import STATIONS
 from nimbus.s02_higher_order import COLUMNS, split_csv
-from nimbus.s03_algebraic_types import BOUNDS, TypedReading, parse_reading
+from nimbus.s03_algebraic_types import BOUNDS, TypedReading, count_by_kind, parse_reading
 
 # ---------------------------------------------------------------------------
 # Result
@@ -117,14 +117,14 @@ def _date_iso(s: str) -> Validation[str]:
     raise AssertionError  # inatteignable
 
 
-def validate_line(fields: list[str]) -> Validation[TypedReading]:
+def validate_line(fields: list[str], stations: Collection[str] = STATIONS) -> Validation[TypedReading]:
     """Exercice 5.5 — valide la STRUCTURE d'une ligne et construit le TypedReading.
 
     Vérifications (toutes, sans s'arrêter à la première) :
       - nombre de colonnes == len(COLUMNS)         sinon "attendu 7 colonnes, reçu N"
         (si ce test échoue, inutile d'aller plus loin : renvoyer directement l'échec)
       - date au format ISO (utiliser `_date_iso`)
-      - station dans STATIONS                         sinon "station inconnue 'X'"
+      - station dans `stations`                       sinon "station inconnue 'X'"
     Les mesures elles-mêmes ne font PAS échouer la ligne : elles deviennent des
     `Measurement` via `parse_reading` (séance 3).
     """
@@ -142,4 +142,57 @@ def load(csv_text: str) -> Loaded:
 
     Numéro de ligne : 2 pour la première ligne de données (l'en-tête est la ligne 1).
     """
+    raise NotImplementedError("S05 — à compléter")
+
+
+# ===========================================================================
+# Partie B — remplacer un import à exceptions (bloc 3)
+# ===========================================================================
+# Lisez `s05_legacy_import.py` : un `try/except` qui avale tout, une ligne entière
+# jetée pour une seule mesure illisible, des valeurs aberrantes acceptées, et un
+# simple print sans la raison. Ici, chaque problème devient une valeur.
+
+
+def rejection_lines(loaded: Loaded) -> list[str]:
+    """Exercice 5.7 — une ligne de rapport par ligne rejetée, dans l'ordre du fichier :
+
+        "ligne 12 : date invalide '2025/01/03' ; station inconnue 'ATLANTIS'"
+
+    (les erreurs d'une même ligne séparées par " ; ").
+    """
+    raise NotImplementedError("S05 — à compléter")
+
+
+def measurement_quality(loaded: Loaded) -> dict[str, dict[str, int]]:
+    """Exercice 5.8 — pour chaque colonne de mesure (clés de BOUNDS), le décompte
+    {"valid": .., "missing": .., "outlier": ..} sur les relevés acceptés.
+
+    Réutilisez `count_by_kind` (bloc 2) et `getattr(r, column)`.
+    """
+    raise NotImplementedError("S05 — à compléter")
+
+
+# ===========================================================================
+# Partie C — un profil d'erreurs sur un flux, en mémoire constante
+# ===========================================================================
+
+
+def error_kind(message: str) -> str:
+    """Fourni : la nature d'une erreur, sans la valeur fautive.
+    "date invalide '2016/01/03'" -> "date invalide" ; "attendu 7 colonnes, reçu 5" -> "attendu 7 colonnes"."""
+    return message.split(" '")[0].split(",")[0]
+
+
+def validate_stream(lines: Iterable[str], stations: Collection[str]) -> Iterator[tuple[int, Validation[TypedReading]]]:
+    """Exercice 5.9 — (numéro de ligne, validation) pour chaque ligne de données, en lazy.
+
+    `lines` commence par l'en-tête (ligne 1, ignorée). Une ligne vide est ignorée.
+    Aucune liste intermédiaire : un generator.
+    """
+    raise NotImplementedError("S05 — à compléter")
+
+
+def error_profile(lines: Iterable[str], stations: Collection[str]) -> dict[str, int]:
+    """Exercice 5.10 — nombre d'erreurs par nature (`error_kind`) sur tout le flux, plus
+    la clé "lignes valides". Une seule passe, mémoire proportionnelle au nombre de natures."""
     raise NotImplementedError("S05 — à compléter")
